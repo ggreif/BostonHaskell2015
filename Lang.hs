@@ -224,7 +224,7 @@ data instance LangSing (a::LangFI) where
   SArithFI  :: LangSing ArithFI
   SFancyFI  :: LangSing FancyFI
 
-data instance LangSing (a::LangPF) where
+data instance LangSing (a :: (* -> *) -> Constraint) where
   SArithPF  :: LangSing ArithPF
   SFancyPF  :: LangSing FancyPF
   SAbsPF    :: LangSing AbsPF
@@ -421,15 +421,18 @@ testSumFI = termFI (AddFI (termFI (LitFI 2))
 -- #+END_EXAMPLE
 
 -- ** Partially Tagless
-data LangPF = ArithPF | FancyPF | AbsPF
+--data LangPF = ArithPF | FancyPF | AbsPF
+type ArithPF = ArithF
+type FancyPF = FancyF
+type AbsPF = AbsF
 
-class EvalPF (lang :: LangPF) where
+class EvalPF (lang :: (* -> *) -> Constraint) where
   evalPF :: (El lang langs, Finally lang e)
          => (forall a. TermPF langs e a -> e a)
          -> Repr lang langs e r -> e r
 
 -- ** Potentially Partial Evaluation
-class PEval (lang :: LangPF) where
+class PEval (lang :: (* -> *) -> Constraint) where
   pevalPF :: (El lang langs,
               Finally lang (TermPF langs e))
           => (forall a. TermPF langs (TermPF langs e) a
@@ -446,7 +449,7 @@ class PEval (lang :: LangPF) where
   pevalPF = evalPF
 
 -- ** Terms Look the Same
-data TermPF :: [LangPF] -> (* -> *) -> * -> * where
+data TermPF :: [(* -> *) -> Constraint] -> (* -> *) -> * -> * where
   TermPF :: (El lang langs, EvalPF lang, PEval lang,
              Finally lang e )
          => LangSing lang
