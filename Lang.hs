@@ -529,7 +529,7 @@ pattern AsLam x <- TermPF SAbsF (LamPF x)
 
 instance PEval AbsF where
   pevalPF k (AppPF f x) = case (k f, k x) of
-                            (AsLam f', x'@(AsLit _)) -> f' x'
+                            (AsLam f', x'@AsLit{}) -> f' x'
                             (f', x') -> app f' x'
   pevalPF k x = evalPF k x
 
