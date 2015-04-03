@@ -427,21 +427,21 @@ type FancyPF = FancyF
 type AbsPF = AbsF
 
 class EvalPF (lang :: (* -> *) -> Constraint) where
-  evalPF :: (El lang langs, Finally lang e)
+  evalPF :: (El lang langs, lang e)
          => (forall a. TermPF langs e a -> e a)
          -> Repr lang langs e r -> e r
 
 -- ** Potentially Partial Evaluation
 class PEval (lang :: (* -> *) -> Constraint) where
   pevalPF :: (El lang langs,
-              Finally lang (TermPF langs e))
+              lang (TermPF langs e))
           => (forall a. TermPF langs (TermPF langs e) a
               -> TermPF langs e a)
           -> Repr lang langs (TermPF langs e) r
           -> TermPF langs e r
   default pevalPF
     :: (El lang langs, EvalPF lang,
-        Finally lang (TermPF langs e))
+        lang (TermPF langs e))
     => (forall a. TermPF langs (TermPF langs e) a
         -> TermPF langs e a)
     -> Repr lang langs (TermPF langs e) r
@@ -451,14 +451,14 @@ class PEval (lang :: (* -> *) -> Constraint) where
 -- ** Terms Look the Same
 data TermPF :: [(* -> *) -> Constraint] -> (* -> *) -> * -> * where
   TermPF :: (El lang langs, EvalPF lang, PEval lang,
-             Finally lang e )
+             lang e )
          => LangSing lang
          -> Repr lang langs e a
          -> TermPF langs e a
 
 -- ** Term Helper :noexport:
 termPF :: (El lang langs, ISing lang, EvalPF lang,
-           PEval lang, Finally lang e)
+           PEval lang, lang e)
        => Repr lang langs e a -> TermPF langs e a
 termPF = TermPF sing
 
@@ -470,7 +470,7 @@ data instance Repr ArithPF langs e a where
         -> Repr ArithPF langs e Int
 
 -- ** Terms as Finally Tagless Backends
-instance (El ArithPF langs, Finally ArithPF e)
+instance (El ArithPF langs, ArithPF e)
   => ArithF (TermPF langs e) where
   lit = termPF . LitPF
   add x y = termPF (AddPF x y)
@@ -481,12 +481,12 @@ data instance Repr FancyPF langs e a where
             -> Repr FancyPF langs e Int
 
 instance (El FancyPF langs, El ArithPF langs,
-          Finally FancyPF e)
+          FancyPF e)
   => FancyF (TermPF langs e) where
   fancyOp = termPF . FancyOpPF
 
 -- ** Evaluation... still Final
-type instance Finally ArithPF e = ArithF e
+--type instance Finally ArithPF e = ArithF e
 
 instance EvalPF ArithPF where
   evalPF _ (LitPF x) = lit x
@@ -508,8 +508,8 @@ instance PEval ArithPF where
       (x', y') -> add x' y'
 
 -- ** Partially Evaluated Code Generation :noexport:
-type instance Finally FancyPF e =
-  (ArithF e, FancyF e)
+--type instance Finally FancyPF e =
+--  (ArithF e, FancyF e)
 
 instance EvalPF FancyPF where
   evalPF k (FancyOpPF x) = fancyOp (k x)
@@ -523,7 +523,7 @@ data instance Repr AbsPF langs e a where
         -> Repr AbsPF langs e b
   VarPF :: e a -> Repr AbsPF langs e a
 
-type instance Finally AbsPF e = AbsF e
+--type instance Finally AbsPF e = AbsF e
 
 -- ** Evaluation
 instance (El AbsPF langs, AbsF e)
@@ -545,9 +545,14 @@ instance PEval AbsPF where
                             (f', x') -> app f' x'
   pevalPF k x = evalPF k x
 
+-- ** AllFinal' :noexport:
+type family AllFinal' langs e :: Constraint where
+  AllFinal' '[] e = ()
+  AllFinal' (l ': ls) e = (l e, AllFinal' ls e)
+
 -- ** Simplify, man
-partialEval :: AllFinal MyLangPF e
-            => (forall f.  AllFinal MyLangPF f
+partialEval :: AllFinal' MyLangPF e
+            => (forall f.  AllFinal' MyLangPF f
                 => TermPF MyLangPF f a)
             -> TermPF MyLangPF e a
 partialEval t = go t
@@ -558,7 +563,7 @@ partialEval t = go t
 -- ** Evaluating Partially Final
 type MyLangPF = [ ArithPF, FancyPF, AbsPF ]
 
-runEvalPF :: (forall e. AllFinal MyLangPF e
+runEvalPF :: (forall e. AllFinal' MyLangPF e
               => TermPF MyLangPF e a)
           -> a
 runEvalPF t = runIdentity (go t)
