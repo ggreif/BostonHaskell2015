@@ -225,17 +225,17 @@ data instance LangSing (a::LangFI) where
   SFancyFI  :: LangSing FancyFI
 
 data instance LangSing (a :: (* -> *) -> Constraint) where
-  SArithPF  :: LangSing ArithPF
-  SFancyPF  :: LangSing FancyPF
-  SAbsPF    :: LangSing AbsPF
+  SArithF   :: LangSing ArithF
+  SFancyF   :: LangSing FancyF
+  SAbsF     :: LangSing AbsF
 
 instance ISing ArithME  where sing = SArithME
 instance ISing FancyME  where sing = SFancyME
 instance ISing ArithFI  where sing = SArithFI
 instance ISing FancyFI  where sing = SFancyFI
-instance ISing ArithPF  where sing = SArithPF
-instance ISing FancyPF  where sing = SFancyPF
-instance ISing AbsPF    where sing = SAbsPF
+instance ISing ArithF   where sing = SArithF
+instance ISing FancyF   where sing = SFancyF
+instance ISing AbsF     where sing = SAbsF
 
 -- ** Indexed Initial Encoding
 -- *** Modularly Tagged
@@ -421,11 +421,6 @@ testSumFI = termFI (AddFI (termFI (LitFI 2))
 -- #+END_EXAMPLE
 
 -- ** Partially Tagless
---data LangPF = ArithPF | FancyPF | AbsPF
-type ArithPF = ArithF
-type FancyPF = FancyF
-type AbsPF = AbsF
-
 class EvalPF (lang :: (* -> *) -> Constraint) where
   evalPF :: (El lang langs, lang e)
          => (forall a. TermPF langs e a -> e a)
@@ -463,44 +458,42 @@ termPF :: (El lang langs, ISing lang, EvalPF lang,
 termPF = TermPF sing
 
 -- ** Term Data Types Look the Same
-data instance Repr ArithPF langs e a where
-  LitPF :: Int -> Repr ArithPF langs e Int
+data instance Repr ArithF langs e a where
+  LitPF :: Int -> Repr ArithF langs e Int
   AddPF :: TermPF langs e Int
         -> TermPF langs e Int
-        -> Repr ArithPF langs e Int
+        -> Repr ArithF langs e Int
 
 -- ** Terms as Finally Tagless Backends
-instance (El ArithPF langs, ArithPF e)
+instance (El ArithF langs, ArithF e)
   => ArithF (TermPF langs e) where
   lit = termPF . LitPF
   add x y = termPF (AddPF x y)
 
 -- ** Fancy Terms :noexport:
-data instance Repr FancyPF langs e a where
+data instance Repr FancyF langs e a where
   FancyOpPF :: TermPF langs e Int
-            -> Repr FancyPF langs e Int
+            -> Repr FancyF langs e Int
 
-instance (El FancyPF langs, El ArithPF langs,
-          FancyPF e)
+instance (El FancyF langs, El ArithF langs,
+          FancyF e)
   => FancyF (TermPF langs e) where
   fancyOp = termPF . FancyOpPF
 
 -- ** Evaluation... still Final
---type instance Finally ArithPF e = ArithF e
-
-instance EvalPF ArithPF where
+instance EvalPF ArithF where
   evalPF _ (LitPF x) = lit x
   evalPF k (AddPF x y) = add (k x) (k y)
 
 -- ** Partial Evaluation
 -- *** /Not Boring/
-pattern AsLit x <- TermPF SArithPF (LitPF x)
+pattern AsLit x <- TermPF SArithF (LitPF x)
 
-litPF :: (ArithF e, El ArithPF langs)
+litPF :: (ArithF e, El ArithF langs)
       => Int -> TermPF langs e Int
 litPF = termPF . LitPF
 
-instance PEval ArithPF where
+instance PEval ArithF where
   pevalPF _ (LitPF x) = lit x
   pevalPF k (AddPF x y) =
     case (k x, k y) of
@@ -508,38 +501,33 @@ instance PEval ArithPF where
       (x', y') -> add x' y'
 
 -- ** Partially Evaluated Code Generation :noexport:
---type instance Finally FancyPF e =
---  (ArithF e, FancyF e)
-
-instance EvalPF FancyPF where
+instance EvalPF FancyF where
   evalPF k (FancyOpPF x) = fancyOp (k x)
 
 -- ** Bringing Lambda Back
-data instance Repr AbsPF langs e a where
+data instance Repr AbsF langs e a where
   LamPF :: (TermPF langs e a -> TermPF langs e b)
-        -> Repr AbsPF langs e (a -> b)
+        -> Repr AbsF langs e (a -> b)
   AppPF :: TermPF langs e (a -> b)
         -> TermPF langs e a
-        -> Repr AbsPF langs e b
-  VarPF :: e a -> Repr AbsPF langs e a
-
---type instance Finally AbsPF e = AbsF e
+        -> Repr AbsF langs e b
+  VarPF :: e a -> Repr AbsF langs e a
 
 -- ** Evaluation
-instance (El AbsPF langs, AbsF e)
+instance (El AbsF langs, AbsF e)
   => AbsF (TermPF langs e) where
   lam = termPF . LamPF
   app f = termPF . AppPF f
 
-instance EvalPF AbsPF where
+instance EvalPF AbsF where
   evalPF k (LamPF f) = lam $ k . f . termPF . VarPF
   evalPF _ (VarPF x) = x
   evalPF k (AppPF f x) = app (k f) (k x)
 
 -- ** Applied Haskell
-pattern AsLam x <- TermPF SAbsPF (LamPF x)
+pattern AsLam x <- TermPF SAbsF (LamPF x)
 
-instance PEval AbsPF where
+instance PEval AbsF where
   pevalPF k (AppPF f x) = case (k f, k x) of
                             (AsLam f', x'@(AsLit _)) -> f' x'
                             (f', x') -> app f' x'
@@ -561,7 +549,7 @@ partialEval t = go t
         go (TermPF _ x) = pevalPF go x
 
 -- ** Evaluating Partially Final
-type MyLangPF = [ ArithPF, FancyPF, AbsPF ]
+type MyLangPF = [ ArithF, FancyF, AbsF ]
 
 runEvalPF :: (forall e. AllFinal' MyLangPF e
               => TermPF MyLangPF e a)
@@ -625,7 +613,7 @@ peApp = i2f (partialEval  testApp)
 -- #+END_EXAMPLE
 
 -- ** An Emulator in an Optimizer
-instance PEval FancyPF where
+instance PEval FancyF where
   pevalPF k (FancyOpPF x) = case k x of
                               AsLit x' -> litPF . runIdentity $
                                           fancyOp (lit x')
