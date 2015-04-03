@@ -421,13 +421,13 @@ testSumFI = termFI (AddFI (termFI (LitFI 2))
 -- #+END_EXAMPLE
 
 -- ** Partially Tagless
-class EvalPF (lang :: (* -> *) -> Constraint) where
+class EvalPF lang where
   evalPF :: (El lang langs, lang e)
          => (forall a. TermPF langs e a -> e a)
          -> Repr lang langs e r -> e r
 
 -- ** Potentially Partial Evaluation
-class PEval (lang :: (* -> *) -> Constraint) where
+class PEval lang where
   pevalPF :: (El lang langs,
               lang (TermPF langs e))
           => (forall a. TermPF langs (TermPF langs e) a
@@ -446,7 +446,7 @@ class PEval (lang :: (* -> *) -> Constraint) where
 -- ** Terms Look the Same
 data TermPF :: [(* -> *) -> Constraint] -> (* -> *) -> * -> * where
   TermPF :: (El lang langs, EvalPF lang, PEval lang,
-             lang e )
+             lang e)
          => LangSing lang
          -> Repr lang langs e a
          -> TermPF langs e a
